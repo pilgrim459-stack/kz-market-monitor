@@ -22,7 +22,7 @@ def load_data():
         # Качаем данные
         df = yf.download(tickers, period="max", interval="1d", group_by='ticker', progress=False, auto_adjust=False)
         
-        # Превращаем индекс в дату (убираем часовой пояс для корректного сравнения)
+        # Превращаем индекс в дату (убираем часовой пояс)
         df.index = pd.to_datetime(df.index).tz_localize(None)
         df = df.sort_index()
         return df
@@ -108,20 +108,14 @@ if not main_df.empty:
     for tab, ticker, title in charts_config:
         with tab:
             try:
-                # Получаем данные конкретного тикера без пустых значений
+                # Получаем данные
                 df_ticker = filtered_main_df[ticker].dropna()
 
                 if not df_ticker.empty:
                     
-                    # --- ГЛАВНАЯ МАГИЯ: ВЫЧИСЛЯЕМ ВСЕ ПРОПУЩЕННЫЕ ДАТЫ ---
-                    # 1. Создаем полный календарь от начала до конца наших данных
+                    # --- ВЫЧИСЛЯЕМ ПРОПУЩЕННЫЕ ДАТЫ (ДЛЯ СКЛЕЙКИ) ---
                     all_days = pd.date_range(start=df_ticker.index.min(), end=df_ticker.index.max(), freq='D')
-                    
-                    # 2. Находим разницу: (Полный календарь) минус (Наши данные)
-                    # Это и будут все выходные и праздники
                     missing_dates = all_days.difference(df_ticker.index)
-                    
-                    # Переводим в формат строк для Plotly
                     dt_breaks = missing_dates.strftime("%Y-%m-%d").tolist()
 
                     # РИСУЕМ СВЕЧИ
@@ -140,7 +134,8 @@ if not main_df.empty:
                         yaxis_title='Цена',
                         xaxis_title='',
                         dragmode=False, 
-                        hovermode='x unified',
+                        # ВАЖНО: closest заставляет окошко следовать за мышкой
+                        hovermode='closest', 
                         margin=dict(l=20, r=20, t=40, b=20),
                         height=500
                     )
@@ -148,7 +143,6 @@ if not main_df.empty:
                     # ПРИМЕНЯЕМ СКРЫТИЕ ДАТ
                     fig.update_xaxes(
                         rangeslider_visible=False,
-                        # Передаем список всех "плохих" дат в values
                         rangebreaks=[dict(values=dt_breaks)], 
                         showspikes=True, spikemode='across', spikesnap='cursor',
                         showgrid=True, gridcolor='#F0F0F0'
