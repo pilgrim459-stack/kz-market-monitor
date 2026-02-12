@@ -132,10 +132,9 @@ if not main_df.empty:
                         yaxis_title='Цена',
                         xaxis_title='',
                         dragmode=False, 
-                        # ВАЖНО: 'x' привязывает к вертикальной линии
                         hovermode='x',
-                        # hoverdistance=-1 означает "лови курсор на любом расстоянии по вертикали"
-                        hoverdistance=-1,
+                        hoverdistance=-1, # Ловит курсор везде
+                        spikedistance=-1, # <--- ПЕРЕНЕС СЮДА (Линии ловят курсор везде)
                         margin=dict(l=20, r=20, t=40, b=20),
                         height=500
                     )
@@ -144,15 +143,13 @@ if not main_df.empty:
                     fig.update_xaxes(
                         rangeslider_visible=False,
                         rangebreaks=[dict(values=dt_breaks)], 
-                        # spikedistance=-1 делает вертикальную линию видимой всегда
-                        showspikes=True, spikemode='across', spikesnap='cursor', spikedistance=-1,
+                        showspikes=True, spikemode='across', spikesnap='cursor',
                         showgrid=True, gridcolor='#F0F0F0'
                     )
                     
                     fig.update_yaxes(
                         fixedrange=False,
-                        # spikedistance=-1 делает горизонтальную линию видимой всегда
-                        showspikes=True, spikemode='across', spikesnap='cursor', spikedistance=-1,
+                        showspikes=True, spikemode='across', spikesnap='cursor',
                         showgrid=True, gridcolor='#F0F0F0'
                     )
 
