@@ -22,7 +22,7 @@ def load_data():
         # Качаем данные
         df = yf.download(tickers, period="max", interval="1d", group_by='ticker', progress=False, auto_adjust=False)
         
-        # Превращаем индекс в дату (убираем часовой пояс)
+        # Превращаем индекс в дату и убираем таймзону
         df.index = pd.to_datetime(df.index).tz_localize(None)
         df = df.sort_index()
         return df
@@ -91,7 +91,6 @@ if not main_df.empty:
     else: 
         start_date = main_df.index.min()
     
-    # Фильтруем основной датафрейм
     filtered_main_df = main_df[main_df.index >= start_date]
 
     # --- ПОСТРОЕНИЕ ---
@@ -108,12 +107,11 @@ if not main_df.empty:
     for tab, ticker, title in charts_config:
         with tab:
             try:
-                # Получаем данные
                 df_ticker = filtered_main_df[ticker].dropna()
 
                 if not df_ticker.empty:
                     
-                    # --- ВЫЧИСЛЯЕМ ПРОПУЩЕННЫЕ ДАТЫ (ДЛЯ СКЛЕЙКИ) ---
+                    # --- ДАТЫ ДЛЯ СКЛЕЙКИ ---
                     all_days = pd.date_range(start=df_ticker.index.min(), end=df_ticker.index.max(), freq='D')
                     missing_dates = all_days.difference(df_ticker.index)
                     dt_breaks = missing_dates.strftime("%Y-%m-%d").tolist()
@@ -134,8 +132,10 @@ if not main_df.empty:
                         yaxis_title='Цена',
                         xaxis_title='',
                         dragmode=False, 
-                        # ВАЖНО: closest заставляет окошко следовать за мышкой
-                        hovermode='closest', 
+                        # ВАЖНО: 'x' привязывает к вертикальной линии
+                        hovermode='x',
+                        # hoverdistance=-1 означает "лови курсор на любом расстоянии по вертикали"
+                        hoverdistance=-1,
                         margin=dict(l=20, r=20, t=40, b=20),
                         height=500
                     )
@@ -144,13 +144,15 @@ if not main_df.empty:
                     fig.update_xaxes(
                         rangeslider_visible=False,
                         rangebreaks=[dict(values=dt_breaks)], 
-                        showspikes=True, spikemode='across', spikesnap='cursor',
+                        # spikedistance=-1 делает вертикальную линию видимой всегда
+                        showspikes=True, spikemode='across', spikesnap='cursor', spikedistance=-1,
                         showgrid=True, gridcolor='#F0F0F0'
                     )
                     
                     fig.update_yaxes(
                         fixedrange=False,
-                        showspikes=True, spikemode='across', spikesnap='cursor',
+                        # spikedistance=-1 делает горизонтальную линию видимой всегда
+                        showspikes=True, spikemode='across', spikesnap='cursor', spikedistance=-1,
                         showgrid=True, gridcolor='#F0F0F0'
                     )
 
