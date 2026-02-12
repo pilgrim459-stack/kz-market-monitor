@@ -1,6 +1,6 @@
 import streamlit as st
 import yfinance as yf
-import plotly.express as px
+import plotly.graph_objects as go # Используем Graph Objects для свечей
 import pandas as pd
 import datetime
 
@@ -19,16 +19,10 @@ def load_data():
     tickers = ['KZT=X', 'RUB=X', 'BZ=F', 'GC=F', 'SI=F']
     
     try:
-        # Качаем данные
-        df = yf.download(tickers, period="max", interval="1d", progress=False, auto_adjust=False)
+        # ВАЖНО: group_by='ticker' позволяет получить Open, High, Low, Close для каждого тикера отдельно
+        df = yf.download(tickers, period="max", interval="1d", group_by='ticker', progress=False, auto_adjust=False)
         
-        # Обработка мультииндекса
-        if isinstance(df.columns, pd.MultiIndex):
-            try:
-                df = df['Close']
-            except KeyError:
-                 df = df.xs('Close', axis=1, level=1, drop_level=True)
-
+        # Превращаем индекс в дату
         df.index = pd.to_datetime(df.index)
         df = df.sort_index()
         return df
@@ -41,31 +35,42 @@ def load_data():
 with st.spinner('Загружаю исторические архивы...'):
     main_df = load_data()
 
-if not main_df.empty and len(main_df) > 2:
-    last_prices = main_df.iloc[-1]
-    prev_prices = main_df.iloc[-2]
+# Проверяем, есть ли данные (проверка стала чуть сложнее из-за структуры)
+if not main_df.empty:
     
     # 1. МЕТРИКИ
     col1, col2, col3, col4, col5 = st.columns(5)
     
-    def show_metric(col, label, ticker, prefix="", suffix=""):
-        if ticker in last_prices:
-            val = last_prices[ticker]
-            delta = val - prev_prices[ticker]
-            col.metric(label, f"{prefix}{val:.2f}{suffix}", f"{delta:.2f}")
-        else:
-            col.metric(label, "Н/Д", "0")
+    # Список тикеров и их настроек
+    metrics_config = [
+        (col1, "🇰🇿 USD/KZT", 'KZT=X', "₸"),
+        (col2, "🇷🇺 USD/RUB", 'RUB=X', "₽"),
+        (col3, "🛢️ Нефть", 'BZ=F', "$"),
+        (col4, "🥇 Золото", 'GC=F', "$"),
+        (col5, "🥈 Серебро", 'SI=F', "$")
+    ]
 
-    show_metric(col1, "🇰🇿 USD/KZT", 'KZT=X', "₸")
-    show_metric(col2, "🇷🇺 USD/RUB", 'RUB=X', "₽")
-    show_metric(col3, "🛢️ Нефть", 'BZ=F', "$")
-    show_metric(col4, "🥇 Золото", 'GC=F', "$")
-    show_metric(col5, "🥈 Серебро", 'SI=F', "$")
+    for col, label, ticker, prefix in metrics_config:
+        try:
+            # Получаем данные конкретного тикера
+            ticker_df = main_df[ticker]
+            # Берем последние непустые строки
+            ticker_df = ticker_df.dropna()
+            
+            if not ticker_df.empty:
+                last_price = ticker_df['Close'].iloc[-1]
+                prev_price = ticker_df['Close'].iloc[-2]
+                delta = last_price - prev_price
+                col.metric(label, f"{prefix}{last_price:.2f}", f"{delta:.2f}")
+            else:
+                col.metric(label, "Н/Д", "0")
+        except:
+            col.metric(label, "Н/Д", "0")
 
     st.divider()
 
     # 2. ГРАФИКИ
-    st.subheader("Динамика рынка")
+    st.subheader("Динамика рынка (Свечной график)")
     
     # Выбор периода
     timeframe = st.radio(
@@ -92,12 +97,13 @@ if not main_df.empty and len(main_df) > 2:
     else: 
         start_date = main_df.index.min()
     
-    filtered_df = main_df[main_df.index >= start_date].copy()
+    # Обрезаем таблицу по дате
+    filtered_main_df = main_df[main_df.index >= start_date]
 
     # --- ПОСТРОЕНИЕ ---
     tabs = st.tabs(["USD/KZT", "USD/RUB", "Нефть", "Золото", "Серебро"])
-    CHART_COLOR = '#1f77b4' 
-
+    
+    # Конфигурация вкладок
     charts_config = [
         (tabs[0], 'KZT=X', 'Курс USD/KZT'),
         (tabs[1], 'RUB=X', 'Курс USD/RUB'),
@@ -108,56 +114,59 @@ if not main_df.empty and len(main_df) > 2:
 
     for tab, ticker, title in charts_config:
         with tab:
-            if ticker in filtered_df.columns:
-                series = filtered_df[ticker].dropna()
-                
-                if not series.empty:
-                    # Строим базовый график
-                    fig = px.line(x=series.index, y=series.values, title=title)
-                    
-                    # Настройка линии и всплывающей подсказки
-                    fig.update_traces(
-                        line_color=CHART_COLOR,
-                        line_width=2,
-                        hovertemplate="<b>Цена: %{y:.2f}</b><br>Дата: %{x|%d.%m.%Y}<extra></extra>"
-                    )
-                    
-                    # Настройка Оси X (Время)
-                    fig.update_xaxes(
-                        rangeslider_visible=False,
-                        showspikes=True,      
-                        spikemode='across',   
-                        spikesnap='cursor',   
-                        showline=False,       
-                        showgrid=True,        
-                        spikethickness=1,     
-                        spikecolor="gray"
-                    )
-                    
-                    # Настройка Оси Y (Цена)
-                    fig.update_yaxes(
-                        fixedrange=False,
-                        showspikes=True,      
-                        spikemode='across',
-                        spikesnap='cursor',
-                        spikethickness=1,
-                        spikecolor="gray"
+            try:
+                # Получаем данные для тикера
+                df_ticker = filtered_main_df[ticker].dropna()
+
+                if not df_ticker.empty:
+                    # РИСУЕМ СВЕЧИ (Candlestick)
+                    fig = go.Figure(data=[go.Candlestick(
+                        x=df_ticker.index,
+                        open=df_ticker['Open'],
+                        high=df_ticker['High'],
+                        low=df_ticker['Low'],
+                        close=df_ticker['Close'],
+                        name=title
+                    )])
+
+                    # НАСТРОЙКА ИНТЕРФЕЙСА (TradingView Style)
+                    fig.update_layout(
+                        title=title,
+                        yaxis_title='Цена',
+                        xaxis_title='',
+                        # ВАЖНО ДЛЯ МОБИЛЬНЫХ: Отключаем зум пальцами (только перекрестие)
+                        dragmode=False, 
+                        hovermode='x unified', # Единое перекрестие
+                        margin=dict(l=20, r=20, t=40, b=20),
+                        height=500
                     )
 
-                    # Общие настройки макета
-                    fig.update_layout(
-                        hovermode="x", 
-                        margin=dict(l=20, r=20, t=40, b=20),
-                        yaxis_title=None,
-                        xaxis_title=None,
-                        hoverdistance=100 
+                    # Настройка осей
+                    fig.update_xaxes(
+                        rangeslider_visible=False, # Слайдер внизу (мешает на телефоне)
+                        showspikes=True, spikemode='across', spikesnap='cursor',
+                        showgrid=True, gridcolor='#F0F0F0'
                     )
                     
-                    st.plotly_chart(fig, use_container_width=True)
+                    fig.update_yaxes(
+                        fixedrange=False, # Ось Y масштабируется сама
+                        showspikes=True, spikemode='across', spikesnap='cursor',
+                        showgrid=True, gridcolor='#F0F0F0'
+                    )
+
+                    # ВАЖНО: Конфигурация для телефона
+                    # scrollZoom: False -> страница не будет прыгать при скролле
+                    # displayModeBar: False -> убираем меню Plotly сверху (камеру, зум), чтобы не мешало
+                    st.plotly_chart(
+                        fig, 
+                        use_container_width=True,
+                        config={'scrollZoom': False, 'displayModeBar': False} 
+                    )
+
                 else:
                     st.warning("Нет данных за этот период")
-            else:
-                st.warning(f"Нет данных для {title}")
+            except KeyError:
+                st.warning(f"Нет данных для {ticker}")
 
 else:
     st.error("Не удалось загрузить данные. Попробуйте нажать кнопку 'Обновить'.")
