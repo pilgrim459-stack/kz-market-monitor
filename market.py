@@ -19,8 +19,10 @@ def load_data():
     tickers = ['KZT=X', 'RUB=X', 'BZ=F', 'GC=F', 'SI=F']
     
     try:
+        # Качаем данные
         df = yf.download(tickers, period="max", interval="1d", progress=False, auto_adjust=False)
         
+        # Обработка мультииндекса (если Yahoo отдает сложную таблицу)
         if isinstance(df.columns, pd.MultiIndex):
             try:
                 df = df['Close']
@@ -65,6 +67,7 @@ if not main_df.empty and len(main_df) > 2:
     # 2. ГРАФИКИ
     st.subheader("Динамика рынка")
     
+    # Выбор периода
     timeframe = st.radio(
         "Выберите период:",
         options=["1 Месяц", "3 Месяца", "6 Месяцев", "1 Год", "5 Лет", "Все"],
@@ -109,38 +112,54 @@ if not main_df.empty and len(main_df) > 2:
                 series = filtered_df[ticker].dropna()
                 
                 if not series.empty:
+                    # Строим базовый график
                     fig = px.line(x=series.index, y=series.values, title=title)
+                    
+                    # Настройка линии и всплывающей подсказки
                     fig.update_traces(
                         line_color=CHART_COLOR,
                         line_width=2,
-                        # МАГИЯ 1: Чистый тултип. 
-                        # %{y:.2f} - цена с 2 знаками. %{x} - дата.
-                        # <extra></extra> скрывает название трассы (trace 0)
                         hovertemplate="<b>Цена: %{y:.2f}</b><br>Дата: %{x|%d.%m.%Y}<extra></extra>"
                     )
                     
-                    # МАГИЯ 2: TradingView стиль (Перекрестия и метки на осях)
+                    # Настройка Оси X (Время)
                     fig.update_xaxes(
                         rangeslider_visible=False,
-                        showspikes=True,      # Показать линию (шип)
-                        spikemode='across',   # Линия через весь график
-                        spikesnap='cursor',   # Прилипать к курсору
-                        showline=False,       # Скрыть линию оси
-                        showgrid=True,        # Сетка
-                        spikethickness=1,     # Толщина линии
-                        spikecolor="gray",    # Цвет линии
-                        showlabel=True        # ПОКАЗАТЬ МЕТКУ ДАТЫ НА ОСИ X
+                        showspikes=True,      
+                        spikemode='across',   
+                        spikesnap='cursor',   
+                        showline=False,       
+                        showgrid=True,        
+                        spikethickness=1,     
+                        spikecolor="gray",    
+                        showlabel=True        
                     )
                     
+                    # Настройка Оси Y (Цена)
                     fig.update_yaxes(
                         fixedrange=False,
-                        showspikes=True,      # Показать линию
+                        showspikes=True,      
                         spikemode='across',
                         spikesnap='cursor',
                         spikethickness=1,
                         spikecolor="gray",
-                        showlabel=True        # ПОКАЗАТЬ МЕТКУ ЦЕНЫ НА ОСИ Y
-                    )
+                        showlabel=True        
+                    ) # <--- ВОТ ТУТ РАНЬШЕ БЫЛА ОШИБКА, ТЕПЕРЬ ВСЕ ЧЕТКО
 
+                    # Общие настройки макета
                     fig.update_layout(
-                        hovermode="x", # Важно: просто "x", чтобы пере
+                        hovermode="x", 
+                        margin=dict(l=20, r=20, t=40, b=20),
+                        yaxis_title=None,
+                        xaxis_title=None,
+                        hoverdistance=100 
+                    )
+                    
+                    st.plotly_chart(fig, use_container_width=True)
+                else:
+                    st.warning("Нет данных за этот период")
+            else:
+                st.warning(f"Нет данных для {title}")
+
+else:
+    st.error("Не удалось загрузить данные. Попробуйте нажать кнопку 'Обновить'.")
