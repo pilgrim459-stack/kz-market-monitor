@@ -14,28 +14,21 @@ if st.button('Обновить данные 🔄'):
     st.cache_data.clear()
 
 # --- Функция загрузки данных ---
-@st.cache_data(ttl=900) # Кэшируем данные на 15 минут
+@st.cache_data(ttl=900) 
 def load_data():
-    # Тикеры:
     tickers = ['KZT=X', 'RUB=X', 'BZ=F', 'GC=F', 'SI=F']
     
-    # Качаем данные за 2 года (чтобы была история)
-    # Используем 'yfinance' без корректировок, чтобы ускорить процесс
+    # ИЗМЕНЕНИЕ 1: Качаем ВСЮ доступную историю (period="max")
     try:
-        df = yf.download(tickers, period="2y", interval="1d", progress=False, auto_adjust=False)
+        df = yf.download(tickers, period="max", interval="1d", progress=False, auto_adjust=False)
         
-        # Исправляем структуру таблицы
         if isinstance(df.columns, pd.MultiIndex):
-            # Если мультииндекс, берем Close или Adj Close
             try:
                 df = df['Close']
             except KeyError:
-                 # Если нет Close, ищем что-то похожее или берем первый уровень
                  df = df.xs('Close', axis=1, level=1, drop_level=True)
 
-        # Убеждаемся, что индекс - это даты
         df.index = pd.to_datetime(df.index)
-        # Сортируем по дате
         df = df.sort_index()
         
         return df
@@ -45,11 +38,10 @@ def load_data():
         return pd.DataFrame()
 
 # --- Загрузка и Отображение ---
-with st.spinner('Связываюсь с биржами...'):
+with st.spinner('Загружаю исторические архивы...'):
     main_df = load_data()
 
 if not main_df.empty and len(main_df) > 2:
-    # Получаем последние цены
     last_prices = main_df.iloc[-1]
     prev_prices = main_df.iloc[-2]
     
@@ -75,19 +67,19 @@ if not main_df.empty and len(main_df) > 2:
     # 2. ГРАФИКИ
     st.subheader("Динамика рынка")
     
-    # --- НОВЫЙ ПЕРЕКЛЮЧАТЕЛЬ ТАЙМФРЕЙМОВ (Управление через Streamlit) ---
+    # ИЗМЕНЕНИЕ 2: Добавил "5 Лет" в список
     timeframe = st.radio(
         "Выберите период:",
-        options=["1 Месяц", "3 Месяца", "6 Месяцев", "1 Год", "Все"],
-        index=0, # По умолчанию 1 Месяц
+        options=["1 Месяц", "3 Месяца", "6 Месяцев", "1 Год", "5 Лет", "Все"],
+        index=0, 
         horizontal=True,
         key="tf_selector"
     )
 
-    # --- ЛОГИКА ФИЛЬТРАЦИИ ДАННЫХ ---
+    # --- ЛОГИКА ФИЛЬТРАЦИИ ---
     end_date = main_df.index.max()
-    start_date = main_df.index.min()
-
+    
+    # Если данных мало, берем минимум, иначе считаем от конца
     if timeframe == "1 Месяц":
         start_date = end_date - pd.Timedelta(days=30)
     elif timeframe == "3 Месяца":
@@ -96,15 +88,16 @@ if not main_df.empty and len(main_df) > 2:
         start_date = end_date - pd.Timedelta(days=180)
     elif timeframe == "1 Год":
         start_date = end_date - pd.Timedelta(days=365)
+    elif timeframe == "5 Лет": # Новая логика для 5 лет
+        start_date = end_date - pd.Timedelta(days=365*5)
     else: # "Все"
-        start_date = main_df.index.min()
+        start_date = main_df.index.min() # Самая первая дата в истории
     
-    # Обрезаем датафрейм по выбранной дате
     filtered_df = main_df[main_df.index >= start_date].copy()
 
-    # --- ПОСТРОЕНИЕ ГРАФИКОВ ---
+    # --- ПОСТРОЕНИЕ ---
     tabs = st.tabs(["USD/KZT", "USD/RUB", "Нефть", "Золото", "Серебро"])
-    CHART_COLOR = '#1f77b4' # Синий
+    CHART_COLOR = '#1f77b4' 
 
     charts_config = [
         (tabs[0], 'KZT=X', 'Курс USD/KZT'),
@@ -117,17 +110,27 @@ if not main_df.empty and len(main_df) > 2:
     for tab, ticker, title in charts_config:
         with tab:
             if ticker in filtered_df.columns:
-                # Строим график на основе УЖЕ ОБРЕЗАННЫХ данных
-                fig = px.line(filtered_df, y=ticker, title=title, color_discrete_sequence=[CHART_COLOR])
+                # Отсекаем пустые значения (важно для "Все", так как истории у инструментов разные)
+                series = filtered_df[ticker].dropna()
                 
-                # Убираем всё лишнее, оставляем чистый график
-                fig.update_xaxes(rangeslider_visible=False)
-                fig.update_yaxes(fixedrange=False) # Разрешаем зум по вертикали
-                fig.update_layout(hovermode="x unified", margin=dict(l=20, r=20, t=40, b=20))
-                
-                st.plotly_chart(fig, use_container_width=True)
+                if not series.empty:
+                    fig = px.line(x=series.index, y=series.values, title=title)
+                    fig.update_traces(line_color=CHART_COLOR)
+                    
+                    fig.update_xaxes(rangeslider_visible=False)
+                    fig.update_yaxes(fixedrange=False)
+                    fig.update_layout(
+                        hovermode="x unified", 
+                        margin=dict(l=20, r=20, t=40, b=20),
+                        yaxis_title=None,
+                        xaxis_title=None
+                    )
+                    
+                    st.plotly_chart(fig, use_container_width=True)
+                else:
+                    st.warning("Нет данных за этот период")
             else:
                 st.warning(f"Нет данных для {title}")
 
 else:
-    st.error("Не удалось загрузить данные. Биржа может быть закрыта или данные недоступны. Попробуйте нажать кнопку 'Обновить'.")
+    st.error("Не удалось загрузить данные. Попробуйте нажать кнопку 'Обновить'.")
