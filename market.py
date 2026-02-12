@@ -22,8 +22,8 @@ def load_data():
         # Качаем данные
         df = yf.download(tickers, period="max", interval="1d", group_by='ticker', progress=False, auto_adjust=False)
         
-        # Превращаем индекс в дату
-        df.index = pd.to_datetime(df.index)
+        # Превращаем индекс в дату (убираем часовой пояс для корректного сравнения)
+        df.index = pd.to_datetime(df.index).tz_localize(None)
         df = df.sort_index()
         return df
         
@@ -91,6 +91,7 @@ if not main_df.empty:
     else: 
         start_date = main_df.index.min()
     
+    # Фильтруем основной датафрейм
     filtered_main_df = main_df[main_df.index >= start_date]
 
     # --- ПОСТРОЕНИЕ ---
@@ -107,9 +108,22 @@ if not main_df.empty:
     for tab, ticker, title in charts_config:
         with tab:
             try:
+                # Получаем данные конкретного тикера без пустых значений
                 df_ticker = filtered_main_df[ticker].dropna()
 
                 if not df_ticker.empty:
+                    
+                    # --- ГЛАВНАЯ МАГИЯ: ВЫЧИСЛЯЕМ ВСЕ ПРОПУЩЕННЫЕ ДАТЫ ---
+                    # 1. Создаем полный календарь от начала до конца наших данных
+                    all_days = pd.date_range(start=df_ticker.index.min(), end=df_ticker.index.max(), freq='D')
+                    
+                    # 2. Находим разницу: (Полный календарь) минус (Наши данные)
+                    # Это и будут все выходные и праздники
+                    missing_dates = all_days.difference(df_ticker.index)
+                    
+                    # Переводим в формат строк для Plotly
+                    dt_breaks = missing_dates.strftime("%Y-%m-%d").tolist()
+
                     # РИСУЕМ СВЕЧИ
                     fig = go.Figure(data=[go.Candlestick(
                         x=df_ticker.index,
@@ -125,20 +139,17 @@ if not main_df.empty:
                         title=title,
                         yaxis_title='Цена',
                         xaxis_title='',
-                        dragmode=False, # Фикс для телефона
+                        dragmode=False, 
                         hovermode='x unified',
                         margin=dict(l=20, r=20, t=40, b=20),
                         height=500
                     )
 
-                    # --- НАСТРОЙКА ОСИ X (ГЛАВНАЯ МАГИЯ ТУТ) ---
+                    # ПРИМЕНЯЕМ СКРЫТИЕ ДАТ
                     fig.update_xaxes(
                         rangeslider_visible=False,
-                        # rangebreaks - это команда "скрыть периоды"
-                        # bounds=["sat", "mon"] означает: скрой всё от Субботы до Понедельника
-                        rangebreaks=[
-                            dict(bounds=["sat", "mon"]), 
-                        ],
+                        # Передаем список всех "плохих" дат в values
+                        rangebreaks=[dict(values=dt_breaks)], 
                         showspikes=True, spikemode='across', spikesnap='cursor',
                         showgrid=True, gridcolor='#F0F0F0'
                     )
