@@ -15,15 +15,9 @@ if st.button('Обновить данные 🔄'):
 
 # --- Функция загрузки данных ---
 def load_data():
-    # Тикеры:
-    # KZT=X -> USD/KZT
-    # RUB=X -> USD/RUB
-    # BZ=F  -> Нефть Brent
-    # GC=F  -> Золото
-    # SI=F  -> Серебро
     tickers = ['KZT=X', 'RUB=X', 'BZ=F', 'GC=F', 'SI=F']
     
-    # Качаем данные за последние 2 года (чтобы кнопки 12м и Все работали корректно)
+    # Качаем данные за 2 года
     df = yf.download(tickers, period="2y", interval="1d", progress=False)
     
     # Исправляем структуру таблицы
@@ -40,7 +34,6 @@ with st.spinner('Связываюсь с биржами...'):
     df = load_data()
 
 if not df.empty:
-    # Получаем последние цены
     last_prices = df.iloc[-1]
     prev_prices = df.iloc[-2]
     
@@ -63,14 +56,11 @@ if not df.empty:
     # 2. ГРАФИКИ
     st.subheader("Динамика рынка")
     
-    # Вкладки
     tabs = st.tabs(["USD/KZT", "USD/RUB", "Нефть", "Золото", "Серебро"])
     
-    # ЕДИНЫЙ ЦВЕТ ДЛЯ ВСЕХ ГРАФИКОВ (Синий)
-    # Если захочешь зеленый, поменяй на '#008000' или 'green'
+    # Цвет графиков (Синий)
     CHART_COLOR = '#1f77b4' 
 
-    # Настройки графиков
     charts_config = [
         (tabs[0], 'KZT=X', 'Курс USD/KZT'),
         (tabs[1], 'RUB=X', 'Курс USD/RUB'),
@@ -81,12 +71,11 @@ if not df.empty:
 
     for tab, ticker, title in charts_config:
         with tab:
-            # Строим график
             fig = px.line(df, y=ticker, title=title, color_discrete_sequence=[CHART_COLOR])
             
-            # --- НАСТРОЙКА КНОПОК ТАЙМФРЕЙМА (1М, 3М, 6М, 12М, Все) ---
+            # --- НАСТРОЙКА ОСЕЙ ---
             fig.update_xaxes(
-                rangeslider_visible=True,
+                rangeslider_visible=False, # ВАЖНО: Выключаем слайдер, чтобы работал авто-зум
                 rangeselector=dict(
                     buttons=list([
                         dict(count=1, label="1м", step="month", stepmode="backward"),
@@ -97,9 +86,11 @@ if not df.empty:
                     ])
                 )
             )
-            # Фиксация осей и зума
-            fig.update_layout(hovermode="x unified") 
             
+            # Включаем автомасштабирование по оси Y
+            fig.update_yaxes(autorange=True, fixedrange=False)
+            
+            fig.update_layout(hovermode="x unified") 
             st.plotly_chart(fig, use_container_width=True)
 
 else:
