@@ -22,7 +22,7 @@ def load_data():
         # Качаем данные
         df = yf.download(tickers, period="max", interval="1d", progress=False, auto_adjust=False)
         
-        # Обработка мультииндекса (если Yahoo отдает сложную таблицу)
+        # Обработка мультииндекса
         if isinstance(df.columns, pd.MultiIndex):
             try:
                 df = df['Close']
@@ -131,8 +131,7 @@ if not main_df.empty and len(main_df) > 2:
                         showline=False,       
                         showgrid=True,        
                         spikethickness=1,     
-                        spikecolor="gray",    
-                        showlabel=True        
+                        spikecolor="gray"
                     )
                     
                     # Настройка Оси Y (Цена)
@@ -142,9 +141,8 @@ if not main_df.empty and len(main_df) > 2:
                         spikemode='across',
                         spikesnap='cursor',
                         spikethickness=1,
-                        spikecolor="gray",
-                        showlabel=True        
-                    ) # <--- ВОТ ТУТ РАНЬШЕ БЫЛА ОШИБКА, ТЕПЕРЬ ВСЕ ЧЕТКО
+                        spikecolor="gray"
+                    )
 
                     # Общие настройки макета
                     fig.update_layout(
