@@ -15,16 +15,16 @@ if st.button('Обновить данные 🔄'):
 
 # --- Функция загрузки данных ---
 def load_data():
-    # Тикеры Yahoo Finance:
+    # Тикеры:
     # KZT=X -> USD/KZT
-    # RUB=X -> USD/RUB (Новый)
+    # RUB=X -> USD/RUB
     # BZ=F  -> Нефть Brent
     # GC=F  -> Золото
-    # SI=F  -> Серебро (Новый)
+    # SI=F  -> Серебро
     tickers = ['KZT=X', 'RUB=X', 'BZ=F', 'GC=F', 'SI=F']
     
-    # Качаем данные за последний год
-    df = yf.download(tickers, period="1y", interval="1d", progress=False)
+    # Качаем данные за последние 2 года (чтобы кнопки 12м и Все работали корректно)
+    df = yf.download(tickers, period="2y", interval="1d", progress=False)
     
     # Исправляем структуру таблицы
     if isinstance(df.columns, pd.MultiIndex):
@@ -44,10 +44,9 @@ if not df.empty:
     last_prices = df.iloc[-1]
     prev_prices = df.iloc[-2]
     
-    # 1. МЕТРИКИ (5 штук в ряд)
+    # 1. МЕТРИКИ
     col1, col2, col3, col4, col5 = st.columns(5)
     
-    # Функция для красивого отображения метрики
     def show_metric(col, label, ticker, prefix="", suffix=""):
         val = last_prices[ticker]
         delta = val - prev_prices[ticker]
@@ -61,38 +60,44 @@ if not df.empty:
 
     st.divider()
 
-    # 2. ГРАФИКИ С УЛУЧШЕННЫМ ЗУМОМ
-    st.subheader("Динамика за 1 год")
+    # 2. ГРАФИКИ
+    st.subheader("Динамика рынка")
     
-    # Создаем вкладки
+    # Вкладки
     tabs = st.tabs(["USD/KZT", "USD/RUB", "Нефть", "Золото", "Серебро"])
     
-    # Словарь настроек для каждого графика
+    # ЕДИНЫЙ ЦВЕТ ДЛЯ ВСЕХ ГРАФИКОВ (Синий)
+    # Если захочешь зеленый, поменяй на '#008000' или 'green'
+    CHART_COLOR = '#1f77b4' 
+
+    # Настройки графиков
     charts_config = [
-        (tabs[0], 'KZT=X', 'Курс USD/KZT', 'green'),
-        (tabs[1], 'RUB=X', 'Курс USD/RUB', 'red'),
-        (tabs[2], 'BZ=F',  'Нефть Brent',  'black'),
-        (tabs[3], 'GC=F',  'Золото',       'gold'),
-        (tabs[4], 'SI=F',  'Серебро',      'silver')
+        (tabs[0], 'KZT=X', 'Курс USD/KZT'),
+        (tabs[1], 'RUB=X', 'Курс USD/RUB'),
+        (tabs[2], 'BZ=F',  'Нефть Brent'),
+        (tabs[3], 'GC=F',  'Золото'),
+        (tabs[4], 'SI=F',  'Серебро')
     ]
 
-    for tab, ticker, title, color in charts_config:
+    for tab, ticker, title in charts_config:
         with tab:
             # Строим график
-            fig = px.line(df, y=ticker, title=title, color_discrete_sequence=[color])
+            fig = px.line(df, y=ticker, title=title, color_discrete_sequence=[CHART_COLOR])
             
-            # --- МАГИЯ: ДОБАВЛЯЕМ СЛАЙДЕР И УБИРАЕМ "ПРЫЖКИ" ---
+            # --- НАСТРОЙКА КНОПОК ТАЙМФРЕЙМА (1М, 3М, 6М, 12М, Все) ---
             fig.update_xaxes(
-                rangeslider_visible=True,  # Включаем нижний бегунок
+                rangeslider_visible=True,
                 rangeselector=dict(
                     buttons=list([
                         dict(count=1, label="1м", step="month", stepmode="backward"),
+                        dict(count=3, label="3м", step="month", stepmode="backward"),
                         dict(count=6, label="6м", step="month", stepmode="backward"),
-                        dict(label="Все", step="all")
+                        dict(count=12, label="12м", step="month", stepmode="backward"),
+                        dict(step="all", label="Все")
                     ])
                 )
             )
-            # Фиксируем ось Y, чтобы она не скакала слишком сильно, но подстраивалась
+            # Фиксация осей и зума
             fig.update_layout(hovermode="x unified") 
             
             st.plotly_chart(fig, use_container_width=True)
