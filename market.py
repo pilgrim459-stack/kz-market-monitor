@@ -19,7 +19,9 @@ def load_data():
     tickers = ['KZT=X', 'RUB=X', 'BZ=F', 'GC=F', 'SI=F']
     
     try:
+        # Получаем данные
         df = yf.download(tickers, period="max", interval="1d", group_by='ticker', progress=False, auto_adjust=False)
+        # Убираем часовой пояс для корректной работы
         df.index = pd.to_datetime(df.index).tz_localize(None)
         df = df.sort_index()
         return df
@@ -125,7 +127,7 @@ if not main_df.empty:
                         yaxis_title='Цена',
                         xaxis_title='',
                         dragmode=False, 
-                        # 'x' - классический режим. Показывает данные для точки на оси X.
+                        # 'x' - классический надежный режим. 
                         hovermode='x',
                         margin=dict(l=20, r=20, t=40, b=20),
                         height=500
@@ -135,9 +137,9 @@ if not main_df.empty:
                     fig.update_xaxes(
                         rangeslider_visible=False,
                         rangebreaks=[dict(values=dt_breaks)], 
-                        showspikes=True, 
-                        spikemode='across', 
-                        spikesnap='cursor', # Линия прилипает к КУРСОРУ
+                        showspikes=True,        # ВКЛЮЧАЕМ ШИПЫ (Линии)
+                        spikemode='across',     # ЧЕРЕЗ ВЕСЬ ГРАФИК
+                        spikesnap='cursor',     # ЛИПНУТЬ К КУРСОРУ
                         showline=True,
                         spikecolor="gray",
                         spikethickness=1,
@@ -147,9 +149,9 @@ if not main_df.empty:
                     
                     fig.update_yaxes(
                         fixedrange=False,
-                        showspikes=True, 
+                        showspikes=True,        # ВКЛЮЧАЕМ ШИПЫ (Линии)
                         spikemode='across', 
-                        spikesnap='cursor', # Линия прилипает к КУРСОРУ
+                        spikesnap='cursor', 
                         spikecolor="gray",
                         spikethickness=1,
                         showgrid=True, 
