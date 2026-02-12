@@ -19,14 +19,10 @@ def load_data():
     tickers = ['KZT=X', 'RUB=X', 'BZ=F', 'GC=F', 'SI=F']
     
     try:
-        # Качаем данные
         df = yf.download(tickers, period="max", interval="1d", group_by='ticker', progress=False, auto_adjust=False)
-        
-        # Превращаем индекс в дату и убираем таймзону
         df.index = pd.to_datetime(df.index).tz_localize(None)
         df = df.sort_index()
         return df
-        
     except Exception as e:
         st.error(f"Ошибка при загрузке с Yahoo Finance: {e}")
         return pd.DataFrame()
@@ -66,7 +62,6 @@ if not main_df.empty:
     # 2. ГРАФИКИ
     st.subheader("Динамика рынка (Свечной график)")
     
-    # Выбор периода
     timeframe = st.radio(
         "Выберите период:",
         options=["1 Месяц", "3 Месяца", "6 Месяцев", "1 Год", "5 Лет", "Все"],
@@ -111,12 +106,11 @@ if not main_df.empty:
 
                 if not df_ticker.empty:
                     
-                    # --- ДАТЫ ДЛЯ СКЛЕЙКИ ---
+                    # Вычисляем пропуски дат (выходные)
                     all_days = pd.date_range(start=df_ticker.index.min(), end=df_ticker.index.max(), freq='D')
                     missing_dates = all_days.difference(df_ticker.index)
                     dt_breaks = missing_dates.strftime("%Y-%m-%d").tolist()
 
-                    # РИСУЕМ СВЕЧИ
                     fig = go.Figure(data=[go.Candlestick(
                         x=df_ticker.index,
                         open=df_ticker['Open'],
@@ -126,26 +120,24 @@ if not main_df.empty:
                         name=title
                     )])
 
-                    # НАСТРОЙКИ МАКЕТА
                     fig.update_layout(
                         title=title,
                         yaxis_title='Цена',
                         xaxis_title='',
                         dragmode=False, 
-                        # ВАЖНО: Возвращаем режим 'x'. Он самый надежный для времени.
+                        # 'x' - классический режим. Показывает данные для точки на оси X.
                         hovermode='x',
                         margin=dict(l=20, r=20, t=40, b=20),
                         height=500
                     )
 
-                    # ПРИМЕНЯЕМ СКРЫТИЕ ДАТ
+                    # Настройка перекрестия (Crosshair)
                     fig.update_xaxes(
                         rangeslider_visible=False,
                         rangebreaks=[dict(values=dt_breaks)], 
-                        # ВКЛЮЧАЕМ ПЕРЕКРЕСТИЕ (SPIKES)
                         showspikes=True, 
                         spikemode='across', 
-                        spikesnap='cursor', # Линия бегает за курсором
+                        spikesnap='cursor', # Линия прилипает к КУРСОРУ
                         showline=True,
                         spikecolor="gray",
                         spikethickness=1,
@@ -155,10 +147,9 @@ if not main_df.empty:
                     
                     fig.update_yaxes(
                         fixedrange=False,
-                        # ВКЛЮЧАЕМ ГОРИЗОНТАЛЬНУЮ ЛИНИЮ
                         showspikes=True, 
                         spikemode='across', 
-                        spikesnap='cursor', # Линия бегает за курсором
+                        spikesnap='cursor', # Линия прилипает к КУРСОРУ
                         spikecolor="gray",
                         spikethickness=1,
                         showgrid=True, 
