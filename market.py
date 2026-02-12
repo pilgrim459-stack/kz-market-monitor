@@ -132,9 +132,8 @@ if not main_df.empty:
                         yaxis_title='Цена',
                         xaxis_title='',
                         dragmode=False, 
+                        # ВАЖНО: Возвращаем режим 'x'. Он самый надежный для времени.
                         hovermode='x',
-                        hoverdistance=-1, # Ловит курсор везде
-                        spikedistance=-1, # <--- ПЕРЕНЕС СЮДА (Линии ловят курсор везде)
                         margin=dict(l=20, r=20, t=40, b=20),
                         height=500
                     )
@@ -143,14 +142,27 @@ if not main_df.empty:
                     fig.update_xaxes(
                         rangeslider_visible=False,
                         rangebreaks=[dict(values=dt_breaks)], 
-                        showspikes=True, spikemode='across', spikesnap='cursor',
-                        showgrid=True, gridcolor='#F0F0F0'
+                        # ВКЛЮЧАЕМ ПЕРЕКРЕСТИЕ (SPIKES)
+                        showspikes=True, 
+                        spikemode='across', 
+                        spikesnap='cursor', # Линия бегает за курсором
+                        showline=True,
+                        spikecolor="gray",
+                        spikethickness=1,
+                        showgrid=True, 
+                        gridcolor='#F0F0F0'
                     )
                     
                     fig.update_yaxes(
                         fixedrange=False,
-                        showspikes=True, spikemode='across', spikesnap='cursor',
-                        showgrid=True, gridcolor='#F0F0F0'
+                        # ВКЛЮЧАЕМ ГОРИЗОНТАЛЬНУЮ ЛИНИЮ
+                        showspikes=True, 
+                        spikemode='across', 
+                        spikesnap='cursor', # Линия бегает за курсором
+                        spikecolor="gray",
+                        spikethickness=1,
+                        showgrid=True, 
+                        gridcolor='#F0F0F0'
                     )
 
                     st.plotly_chart(
