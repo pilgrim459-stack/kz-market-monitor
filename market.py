@@ -18,7 +18,6 @@ if st.button('Обновить данные 🔄'):
 def load_data():
     tickers = ['KZT=X', 'RUB=X', 'BZ=F', 'GC=F', 'SI=F']
     
-    # ИЗМЕНЕНИЕ 1: Качаем ВСЮ доступную историю (period="max")
     try:
         df = yf.download(tickers, period="max", interval="1d", progress=False, auto_adjust=False)
         
@@ -30,7 +29,6 @@ def load_data():
 
         df.index = pd.to_datetime(df.index)
         df = df.sort_index()
-        
         return df
         
     except Exception as e:
@@ -67,7 +65,6 @@ if not main_df.empty and len(main_df) > 2:
     # 2. ГРАФИКИ
     st.subheader("Динамика рынка")
     
-    # ИЗМЕНЕНИЕ 2: Добавил "5 Лет" в список
     timeframe = st.radio(
         "Выберите период:",
         options=["1 Месяц", "3 Месяца", "6 Месяцев", "1 Год", "5 Лет", "Все"],
@@ -79,7 +76,6 @@ if not main_df.empty and len(main_df) > 2:
     # --- ЛОГИКА ФИЛЬТРАЦИИ ---
     end_date = main_df.index.max()
     
-    # Если данных мало, берем минимум, иначе считаем от конца
     if timeframe == "1 Месяц":
         start_date = end_date - pd.Timedelta(days=30)
     elif timeframe == "3 Месяца":
@@ -88,10 +84,10 @@ if not main_df.empty and len(main_df) > 2:
         start_date = end_date - pd.Timedelta(days=180)
     elif timeframe == "1 Год":
         start_date = end_date - pd.Timedelta(days=365)
-    elif timeframe == "5 Лет": # Новая логика для 5 лет
+    elif timeframe == "5 Лет":
         start_date = end_date - pd.Timedelta(days=365*5)
-    else: # "Все"
-        start_date = main_df.index.min() # Самая первая дата в истории
+    else: 
+        start_date = main_df.index.min()
     
     filtered_df = main_df[main_df.index >= start_date].copy()
 
@@ -110,27 +106,41 @@ if not main_df.empty and len(main_df) > 2:
     for tab, ticker, title in charts_config:
         with tab:
             if ticker in filtered_df.columns:
-                # Отсекаем пустые значения (важно для "Все", так как истории у инструментов разные)
                 series = filtered_df[ticker].dropna()
                 
                 if not series.empty:
                     fig = px.line(x=series.index, y=series.values, title=title)
-                    fig.update_traces(line_color=CHART_COLOR)
-                    
-                    fig.update_xaxes(rangeslider_visible=False)
-                    fig.update_yaxes(fixedrange=False)
-                    fig.update_layout(
-                        hovermode="x unified", 
-                        margin=dict(l=20, r=20, t=40, b=20),
-                        yaxis_title=None,
-                        xaxis_title=None
+                    fig.update_traces(
+                        line_color=CHART_COLOR,
+                        line_width=2,
+                        # МАГИЯ 1: Чистый тултип. 
+                        # %{y:.2f} - цена с 2 знаками. %{x} - дата.
+                        # <extra></extra> скрывает название трассы (trace 0)
+                        hovertemplate="<b>Цена: %{y:.2f}</b><br>Дата: %{x|%d.%m.%Y}<extra></extra>"
                     )
                     
-                    st.plotly_chart(fig, use_container_width=True)
-                else:
-                    st.warning("Нет данных за этот период")
-            else:
-                st.warning(f"Нет данных для {title}")
+                    # МАГИЯ 2: TradingView стиль (Перекрестия и метки на осях)
+                    fig.update_xaxes(
+                        rangeslider_visible=False,
+                        showspikes=True,      # Показать линию (шип)
+                        spikemode='across',   # Линия через весь график
+                        spikesnap='cursor',   # Прилипать к курсору
+                        showline=False,       # Скрыть линию оси
+                        showgrid=True,        # Сетка
+                        spikethickness=1,     # Толщина линии
+                        spikecolor="gray",    # Цвет линии
+                        showlabel=True        # ПОКАЗАТЬ МЕТКУ ДАТЫ НА ОСИ X
+                    )
+                    
+                    fig.update_yaxes(
+                        fixedrange=False,
+                        showspikes=True,      # Показать линию
+                        spikemode='across',
+                        spikesnap='cursor',
+                        spikethickness=1,
+                        spikecolor="gray",
+                        showlabel=True        # ПОКАЗАТЬ МЕТКУ ЦЕНЫ НА ОСИ Y
+                    )
 
-else:
-    st.error("Не удалось загрузить данные. Попробуйте нажать кнопку 'Обновить'.")
+                    fig.update_layout(
+                        hovermode="x", # Важно: просто "x", чтобы пере
